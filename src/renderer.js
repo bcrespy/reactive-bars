@@ -3,6 +3,7 @@ import AudioData from "@creenv/audio/audio-analysed-data";
 
 // the values of the config object will be modifier by user controls 
 import config from "./config";
+import imageToBytes from "./image-to-byte";
 
 
 
@@ -30,6 +31,8 @@ class Renderer {
     this.grid = new Float32Array(config.gridsize*config.gridsize);
     this.grid.fill(0);
 
+    this.gridImage = null;
+
     /**
      * @type {Array.<Three.Mesh>}
      */
@@ -38,17 +41,33 @@ class Renderer {
 
     this.onResize = this.onResize.bind(this);
     window.addEventListener("resize", this.onResize);
+
+    return new Promise(resolve => {
+      this.loadImages().then(resolve);
+    });
+  }
+
+  loadImages () {
+    return new Promise(resolve => {
+      let image = new Image();
+      image.onload = data => {
+        this.gridImage = imageToBytes(image);
+        resolve();
+      }
+      image.src = "images/3.jpeg";
+    });
   }
 
   fillRectangles () {
     let geo = new Three.BoxGeometry(config.squareSize, config.barHeight, config.squareSize);
-    let mat = new Three.MeshPhongMaterial({
-      color: 0x00ff00
-    });
     let translateX = config.gridsize*(config.squareSize+config.spaceBetween)/2;
     let translateZ = config.gridsize*(config.squareSize+config.spaceBetween)/2;
 
     for (let i = 0; i < config.gridsize*config.gridsize; i++) {
+      let mat = new Three.MeshPhongMaterial({
+        color: 0xff0000,
+        shininess: 100
+      });
       this.rectangles[i] = new Three.Mesh(geo, mat);
       this.rectangles[i].translateY(-config.barHeight/2);
       let x = (i%config.gridsize)*(config.squareSize+config.spaceBetween) - translateX;
@@ -75,14 +94,25 @@ class Renderer {
    * @param {AudioData} audioData  
    */
   updateGrid (audioData, elapsed) {
+    let black = new Three.Color(0,0,0);
     let gs = config.gridsize*config.gridsize;
     for (let i = 0; i < gs; i++) {
-      this.grid[i] = Three.Math.lerp(this.grid[i], 0, 0.2) + 0.2*Math.cos((i%config.gridsize)/4+elapsed/500) + 0.1*Math.sin((i/config.gridsize)/4+elapsed/500);
+      this.grid[i] = Three.Math.lerp(this.grid[i], 0, 0.1) + 0.1*Math.cos((i%config.gridsize)/4+elapsed/500) + 0.03*Math.sin((i/config.gridsize)/4+elapsed/500);
+      this.rectangles[i].material.color.lerp(black, 0.1);
     }
-    if (audioData.peak.value > 0) {
-      for (let a = 0; a < 80; a++) {
-        let i = Math.random()*gs;
-        this.grid[Math.floor(i)] = audioData.energy/10;
+
+    let to = new Three.Color(1.0,0,0);
+
+    if (audioData.peak.value == 1) {
+      for (let x = 0; x < config.gridsize; x++) {
+        for (let y = 0; y < config.gridsize; y++) {
+          let i = x + config.gridsize*y;
+          if (this.gridImage[i] > 20) {
+            this.grid[i] = this.gridImage[i]/20;
+          }
+          this.rectangles[i].material.color.setRGB(0,0,0);
+          this.rectangles[i].material.color.lerp(to, this.gridImage[i]/100);
+        } 
       }
     }
   }

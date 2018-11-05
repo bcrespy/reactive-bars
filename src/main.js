@@ -27,7 +27,6 @@ class MyProject extends Creenv {
 
     // we initialize our renderer
     this.renderer = new Renderer();
-    this.renderer.init();
 
     this.audio = new AudioManager(AudioManager.SOURCE_TYPE.FILE, {
       filepath: "owl-vision_warhogz.mp3",
@@ -41,7 +40,9 @@ class MyProject extends Creenv {
     });
 
     return new Promise(resolve => {
-      this.audio.init().then(resolve);
+      this.renderer.init().then(() => {
+        this.audio.init().then(resolve);
+      });
     });
   }
 
