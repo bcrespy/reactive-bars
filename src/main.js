@@ -12,7 +12,7 @@ import controls from "./user-controls";
 import AudioManager from "@creenv/audio/manager";
 
 
-import Renderer from "./renderer";
+import Visualizer from "./visualizer";
 
 class MyProject extends Creenv {
   init() {
@@ -26,7 +26,7 @@ class MyProject extends Creenv {
     this.hud.add(this.guiControls);
 
     // we initialize our renderer
-    this.renderer = new Renderer();
+    this.visualizer = new Visualizer();
 
     this.audio = new AudioManager(AudioManager.SOURCE_TYPE.FILE, {
       filepath: "owl-vision_warhogz.mp3",
@@ -40,7 +40,7 @@ class MyProject extends Creenv {
     });
 
     return new Promise(resolve => {
-      this.renderer.init().then(() => {
+      this.visualizer.init().then(() => {
         this.audio.init().then(resolve);
       });
     });
@@ -51,7 +51,7 @@ class MyProject extends Creenv {
    */
   render() {
     this.stats.begin();
-    this.renderer.render(this.deltaT, this.elapsedTime, this.audio.getAnalysedAudioData(this.deltaT, this.elapsedTime));
+    this.visualizer.render(this.deltaT, this.elapsedTime, this.audio.getAnalysedAudioData(this.deltaT, this.elapsedTime));
     this.stats.end();
   }
 }

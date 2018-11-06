@@ -17,7 +17,17 @@ let userControls = {
 
   // the controls property is an array of items
   controls: [
-
+    [
+      "Bokeh", 
+      {
+        property: "focus",
+        min: 0, max: 10, step: 0.0001
+      },
+      {
+        property: "focalLength",
+        min: -100, max: 200, step: 1
+      }
+    ]
   ]
 
 };

@@ -14,7 +14,10 @@ let config = {
   x: 7,
   y: 13,
 
-  changeImageEach: 4000
+  changeImageEach: 4000,
+
+  focus: 0,
+  focalLength: 50
 };
 
 
