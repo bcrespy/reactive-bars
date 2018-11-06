@@ -1,9 +1,11 @@
-import * as Three from "three";
+import * as THREE from "three";
 import AudioData from "@creenv/audio/audio-analysed-data";
 
 // the values of the config object will be modifier by user controls 
 import config from "./config";
 import imageToBytes from "./image-to-byte";
+
+import GlowyShader from "./shaddy";
 
 
 const images = [
@@ -14,9 +16,9 @@ const images = [
 class Renderer {
   init () {
     // setup de la scène 
-    this.scene = new Three.Scene();
-    this.camera = new Three.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    this.renderer = new Three.WebGLRenderer({
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    this.renderer = new THREE.WebGLRenderer({
       antialias: true
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -25,13 +27,13 @@ class Renderer {
     this.camera.position.x = config.pseudoDistance;
     this.camera.position.y = config.pseudoDistance*1.5;
     this.camera.position.z = config.pseudoDistance;
-    this.camera.lookAt(new Three.Vector3(0,0,0));
+    this.camera.lookAt(new THREE.Vector3(0,0,0));
 
-    this.light = new Three.DirectionalLight(0xffffff, 1.0);
+    this.light = new THREE.DirectionalLight(0xffffff, 1.0);
     this.light.position.set(config.x, config.y, config.z);
     this.scene.add(this.light);
 
-    this.scene.fog = new Three.Fog(0x000000, 0.1, 400);
+    this.scene.fog = new THREE.Fog(0x000000, 0.1, 400);
 
     // high grid
     this.grid = new Float32Array(config.gridsize*config.gridsize);
@@ -41,8 +43,13 @@ class Renderer {
     this.gridImage = null;
     this.lastChange = 0;
 
+    // la texture glowy
+    this.texture = null;
+    this.heightMAP = null;
+    this.loadTextures();
+
     /**
-     * @type {Array.<Three.Mesh>}
+     * @type {Array.<THREE.Mesh>}
      */
     this.rectangles = new Array(config.gridsize*config.gridsize);
     this.fillRectangles();
@@ -53,6 +60,10 @@ class Renderer {
     return new Promise(resolve => {
       this.loadImages().then(resolve);
     });
+  }
+
+  loadTextures () {
+    this.heightMAP = new THREE.DataTexture(this.grid, config.gridsize, config.gridsize, THREE.LuminanceFormat, THREE.FloatType);
   }
 
   loadImages () {
@@ -78,17 +89,27 @@ class Renderer {
   }
 
   fillRectangles () {
-    let geo = new Three.BoxGeometry(config.squareSize, config.barHeight, config.squareSize);
+    let geo = new THREE.BoxGeometry(config.squareSize, config.barHeight, config.squareSize);
     let translateX = config.gridsize*(config.squareSize+config.spaceBetween)/2;
     let translateZ = config.gridsize*(config.squareSize+config.spaceBetween)/2;
 
     for (let i = 0; i < config.gridsize*config.gridsize; i++) {
-      let mat = new Three.MeshPhongMaterial({
-        color: 0xff0000,
-        shininess: 200,
-        specular: 0x000000
+      let mat = new THREE.ShaderMaterial({
+        uniforms: {
+          height: { type: "f", value: config.barHeight },
+          grid_x: { type: "f", value: i%config.gridsize },
+          grid_z: { type: "f", value: Math.floor(i/config.gridsize) },
+          gridSize: { type: "f", value: config.gridsize },
+          heightMap: { type: "t", value: this.heightMAP },
+          intensity: { type: "f", value: 0 },
+          color: { type: "v3", value: new THREE.Vector3(0.0, 1.0, 0.0) }
+        },
+        vertexShader: GlowyShader.vertex,
+        fragmentShader: GlowyShader.fragment,
+        side: THREE.DoubleSide
       });
-      this.rectangles[i] = new Three.Mesh(geo, mat);
+
+      this.rectangles[i] = new THREE.Mesh(geo, mat);
       this.rectangles[i].translateY(-config.barHeight/2);
       let x = (i%config.gridsize)*(config.squareSize+config.spaceBetween) - translateX;
       let z = (Math.floor(i/config.gridsize))*(config.squareSize+config.spaceBetween) - translateZ;
@@ -104,8 +125,13 @@ class Renderer {
   }
 
   updateRectanglePos () {
+    let texture = new THREE.DataTexture(this.grid, config.gridsize, config.gridsize, THREE.LuminanceFormat, THREE.FloatType);
+    texture.needsUpdate = true;
     for (let i in this.rectangles) {
-      this.rectangles[i].position.setY(-config.barHeight/2 + this.grid[i]);
+      this.rectangles[i].material.uniforms.intensity.value = this.grid[i];
+      this.rectangles[i].material.uniforms.intensity.needsUpdate = true;
+      this.rectangles[i].material.uniforms.heightMap.value = texture;
+      this.rectangles[i].material.uniforms.heightMap.needsUpdate = true;
     }
   }
 
@@ -114,26 +140,21 @@ class Renderer {
    * @param {AudioData} audioData  
    */
   updateGrid (audioData, elapsed) {
-    let black = new Three.Color(0,0,0);
+    let black = new THREE.Color(0,0,0);
     let gs = config.gridsize*config.gridsize;
     for (let i = 0; i < gs; i++) {
       if (this.grid[i] > 0) {
-        this.grid[i] = Three.Math.lerp(this.grid[i], 0, 0.1) + 0.1*Math.cos((i%config.gridsize)/4+elapsed/500) + 0.03*Math.sin((i/config.gridsize)/4+elapsed/500);
+        this.grid[i] = THREE.Math.lerp(this.grid[i], 0, 0.1) + 0.1*Math.cos((i%config.gridsize)/4+elapsed/500) + 0.03*Math.sin((i/config.gridsize)/4+elapsed/500);
       }
-      this.rectangles[i].material.color.lerp(black, 0.1);
     }
 
-    let to = new Three.Color(1.0,1.0,1.0);
-
-    if (audioData.peak.value == 1) {
+    if (audioData.peak.value > 0.5) {
       for (let x = 0; x < config.gridsize; x++) {
         for (let y = 0; y < config.gridsize; y++) {
           let i = x + config.gridsize*y;
           if (this.gridImage[i] > 20) {
-            this.grid[i] = this.gridImage[i]/20;
+            this.grid[i] = THREE.Math.lerp(this.grid[i], this.gridImage[i]/20, 0.1);
           }
-          this.rectangles[i].material.color.setRGB(0,0,0);
-          this.rectangles[i].material.color.lerp(to, this.gridImage[i]/100);
         } 
       }
     }
@@ -148,10 +169,8 @@ class Renderer {
     let x = Math.cos(elapsed) * config.pseudoDistance;
     let z = Math.sin(elapsed) * config.pseudoDistance;
     let y = Math.cos(elapsed/4) * (config.pseudoDistance*1.25) + config.pseudoDistance*1.5;
-    this.camera.position.x = x;
-    this.camera.position.z = z;
-    this.camera.position.y = y;
-    this.camera.lookAt(new Three.Vector3(0,0,0));
+    this.camera.position.set(x, y, z);
+    this.camera.lookAt(new THREE.Vector3(0,0,0));
   }
 
   /**

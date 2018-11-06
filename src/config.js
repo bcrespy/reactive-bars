@@ -5,7 +5,7 @@
 import Color from '@creenv/color';
 
 let config = {
-  gridsize: 100,
+  gridsize: 100, //100
   squareSize: 0.7,
   barHeight: 20,
   pseudoDistance: 30,
