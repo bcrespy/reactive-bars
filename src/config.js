@@ -12,7 +12,9 @@ let config = {
   spaceBetween: 0.2,
   z: 6.2,
   x: 7,
-  y: 13
+  y: 13,
+
+  changeImageEach: 4000
 };
 
 

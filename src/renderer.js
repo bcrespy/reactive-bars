@@ -6,6 +6,10 @@ import config from "./config";
 import imageToBytes from "./image-to-byte";
 
 
+const images = [
+  "1.jpeg", "2.jpeg", "3.jpeg", "4.jpeg", "5.jpeg", "6.jpeg"
+]
+
 
 class Renderer {
   init () {
@@ -27,11 +31,15 @@ class Renderer {
     this.light.position.set(config.x, config.y, config.z);
     this.scene.add(this.light);
 
+    this.scene.fog = new Three.Fog(0x000000, 0.1, 400);
+
     // high grid
     this.grid = new Float32Array(config.gridsize*config.gridsize);
     this.grid.fill(0);
 
+    this.gridImages = [];
     this.gridImage = null;
+    this.lastChange = 0;
 
     /**
      * @type {Array.<Three.Mesh>}
@@ -49,13 +57,24 @@ class Renderer {
 
   loadImages () {
     return new Promise(resolve => {
-      let image = new Image();
-      image.onload = data => {
-        this.gridImage = imageToBytes(image);
-        resolve();
-      }
-      image.src = "images/3.jpeg";
+      let toLoad = images.length;
+      images.forEach(filename => {
+        let image = new Image();
+        image.onload = data => {
+          this.gridImages.push(imageToBytes(image));
+          toLoad--;
+          if (toLoad==0) {
+            this.getRandomImage();
+            resolve();
+          }
+        }
+        image.src = "images/"+filename;
+      })
     });
+  }
+  
+  getRandomImage () {
+    this.gridImage = this.gridImages[Math.floor(Math.random()*this.gridImages.length)];
   }
 
   fillRectangles () {
@@ -66,7 +85,8 @@ class Renderer {
     for (let i = 0; i < config.gridsize*config.gridsize; i++) {
       let mat = new Three.MeshPhongMaterial({
         color: 0xff0000,
-        shininess: 100
+        shininess: 200,
+        specular: 0x000000
       });
       this.rectangles[i] = new Three.Mesh(geo, mat);
       this.rectangles[i].translateY(-config.barHeight/2);
@@ -97,11 +117,13 @@ class Renderer {
     let black = new Three.Color(0,0,0);
     let gs = config.gridsize*config.gridsize;
     for (let i = 0; i < gs; i++) {
-      this.grid[i] = Three.Math.lerp(this.grid[i], 0, 0.1) + 0.1*Math.cos((i%config.gridsize)/4+elapsed/500) + 0.03*Math.sin((i/config.gridsize)/4+elapsed/500);
+      if (this.grid[i] > 0) {
+        this.grid[i] = Three.Math.lerp(this.grid[i], 0, 0.1) + 0.1*Math.cos((i%config.gridsize)/4+elapsed/500) + 0.03*Math.sin((i/config.gridsize)/4+elapsed/500);
+      }
       this.rectangles[i].material.color.lerp(black, 0.1);
     }
 
-    let to = new Three.Color(1.0,0,0);
+    let to = new Three.Color(1.0,1.0,1.0);
 
     if (audioData.peak.value == 1) {
       for (let x = 0; x < config.gridsize; x++) {
@@ -118,6 +140,21 @@ class Renderer {
   }
 
   /**
+   * fais tourner la caméra autour du centre et la rapproche périodiquement du centre 
+   * 
+   * @param {number} elapsed temps écoulé depuis le début
+   */
+  updateCamera (elapsed) {
+    let x = Math.cos(elapsed) * config.pseudoDistance;
+    let z = Math.sin(elapsed) * config.pseudoDistance;
+    let y = Math.cos(elapsed/4) * (config.pseudoDistance*1.25) + config.pseudoDistance*1.5;
+    this.camera.position.x = x;
+    this.camera.position.z = z;
+    this.camera.position.y = y;
+    this.camera.lookAt(new Three.Vector3(0,0,0));
+  }
+
+  /**
    * The render method uses the time variable to "create" movement.
    * 
    * @param {number} deltaT the time elapsed since last frame call
@@ -125,6 +162,12 @@ class Renderer {
    * @param {AudioData} audioData analysed audio data
    */
   render (deltaT, time, audioData) {
+    this.lastChange+= deltaT;
+    if (this.lastChange>config.changeImageEach) {
+      this.lastChange = 0;
+      this.getRandomImage();  
+    }
+    this.updateCamera(time/2800);
     this.updateGrid(audioData, time);
     this.updateRectanglePos();
     this.renderer.render(this.scene, this.camera);

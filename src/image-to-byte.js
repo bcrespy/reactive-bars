@@ -19,8 +19,8 @@ function imageToBytes (image) {
   canvas.width = size;
   canvas.height = size;
 
-  let xOffset = image.width - size;
-  let yOffset = image.height - size;
+  let xOffset = (image.width - size)/2;
+  let yOffset = (image.height - size)/2;
 
   context.drawImage(image, xOffset, yOffset, size, size, 0, 0, size, size);
   let imgPixels = context.getImageData(0, 0, size, size);
