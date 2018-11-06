@@ -204,7 +204,7 @@ class Visualizer {
     if (this.pixelEffect.granularity>0) {
       this.pixelScenar+= deltaT;
       if (this.pixelScenar>2000) {
-        this.pixelEffect.setGranularity(this.pixelEffect.granularity-2);
+        this.pixelEffect.setGranularity(this.pixelEffect.granularity-4);
         this.pixelScenar = 0;
       }
     }

@@ -9,6 +9,8 @@ import Stats from "@creenv/stats";
 import config from "./config";
 import controls from "./user-controls";
 
+import Capture from "@creenv/capture";
+
 import AudioManager from "@creenv/audio/manager";
 
 
@@ -19,10 +21,10 @@ class MyProject extends Creenv {
     super.init();
     super.framerate(60);
 
-    this.stats = new Stats();
+    //this.stats = new Stats();
     this.guiControls = new GUI(controls);
     this.hud = new HUD();
-    this.hud.add(this.stats);
+    //this.hud.add(this.stats);
     this.hud.add(this.guiControls);
 
     // we initialize our renderer
@@ -33,11 +35,11 @@ class MyProject extends Creenv {
       analyser: {
         peakDetection: {
           options: {
-            threshold: 1.8
+            threshold: 1.07
           }
         }
       }
-    });
+    }, true);
 
     return new Promise(resolve => {
       this.visualizer.init().then(() => {
@@ -50,11 +52,20 @@ class MyProject extends Creenv {
    * will be called at each frame 
    */
   render() {
-    this.stats.begin();
+    //this.stats.begin();
     this.visualizer.render(this.deltaT, this.elapsedTime, this.audio.getAnalysedAudioData(this.deltaT, this.elapsedTime));
-    this.stats.end();
+    //this.stats.end();
   }
 }
 
 let project = new MyProject();
-project.bootstrap(); 
+//project.bootstrap(); 
+
+new Capture(project, {
+  framerate: 60,
+  export: {
+    type: "webm",
+    framerate: 60,
+    filename: "render.webm"
+  }
+})
